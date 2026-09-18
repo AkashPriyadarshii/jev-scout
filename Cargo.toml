@@ -1,0 +1,20 @@
+[package]
+name = "jev-scout"
+version = "0.1.0"
+edition = "2021"
+authors = ["Akash Priyadarshi <272530059+AkashPriyadarshii@users.noreply.github.com>"]
+description = "Zero-hallucination open-source repo and crate scout powered by TypeSafe AI Jev System One scoring"
+license = "MIT"
+repository = "https://github.com/AkashPriyadarshii/jev-scout"
+readme = "README.md"
+keywords = ["typesafe-ai", "jev", "github-search", "crates-io", "mcp-server"]
+categories = ["command-line-utilities", "development-tools"]
+
+[dependencies]
+ureq = { version = "2.12", features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+lexopt = "0.3"
+
+[dev-dependencies]
+serde_json = "1.0"
