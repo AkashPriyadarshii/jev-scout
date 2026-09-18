@@ -3,3 +3,4 @@
 *.pdb
 .env
 .DS_Store
+.supercov/
