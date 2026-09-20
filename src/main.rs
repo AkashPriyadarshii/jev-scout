@@ -8,8 +8,8 @@ use std::process;
 use std::time::Instant;
 
 fn print_help() {
-    println!(
-        r#"jev-scout 0.1.0 - Zero-hallucination open-source repo and crate scout
+    let help = format!(
+        r#"jev-scout {} - Zero-hallucination open-source repo and crate scout
 
 USAGE:
     jev-scout [OPTIONS] <QUERY>
@@ -30,8 +30,10 @@ EXAMPLES:
     jev-scout "fast sqlite tui in rust"
     jev-scout "headless browser without chromium" --ecosystem rust
     jev-scout "token efficient grep for coding agents" --json
-"#
+"#,
+        env!("CARGO_PKG_VERSION")
     );
+    println!("{}", help);
 }
 
 fn main() {
@@ -68,7 +70,7 @@ fn main() {
                 process::exit(0);
             }
             Short('v') | Long("version") => {
-                println!("jev-scout 0.1.0");
+                println!("jev-scout {}", env!("CARGO_PKG_VERSION"));
                 process::exit(0);
             }
             Value(val) => {
