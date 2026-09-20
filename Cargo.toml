@@ -1,6 +1,6 @@
 [package]
 name = "jev-scout"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Akash Priyadarshi <272530059+AkashPriyadarshii@users.noreply.github.com>"]
 description = "Zero-hallucination open-source repo and crate scout powered by TypeSafe AI Jev System One scoring"

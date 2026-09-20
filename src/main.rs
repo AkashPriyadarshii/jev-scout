@@ -21,6 +21,7 @@ OPTIONS:
     -e, --ecosystem <NAME>  Target ecosystem: 'all' (default), 'github', or 'crates'
     -n, --limit <NUM>       Maximum results to show (default: 5)
     -j, --json              Output machine-readable JSON to stdout
+        --no-filter         Show all candidates, skip weak-match filtering
         --mcp               Run as a stdio Model Context Protocol (MCP) server
     -h, --help              Print help information
     -v, --version           Print version information
@@ -38,6 +39,7 @@ fn main() {
     let mut ecosystem = "all".to_string();
     let mut limit = 5usize;
     let mut json_mode = false;
+    let mut no_filter = false;
     let mut mcp_mode = false;
 
     let mut parser = lexopt::Parser::from_env();
@@ -54,6 +56,9 @@ fn main() {
             }
             Short('j') | Long("json") => {
                 json_mode = true;
+            }
+            Long("no-filter") => {
+                no_filter = true;
             }
             Long("mcp") => {
                 mcp_mode = true;
@@ -109,7 +114,9 @@ fn main() {
         println!("🔍 Scouting repositories for: \"{}\"", query_str);
     }
 
+    let search_start = Instant::now();
     let candidates = search::search_candidates(&query_str, &ecosystem, 8);
+    let search_ms = search_start.elapsed().as_millis();
     if candidates.is_empty() {
         if json_mode {
             println!("[]");
@@ -119,6 +126,7 @@ fn main() {
         return;
     }
 
+    let eval_start = Instant::now();
     let evaluated = match jev::evaluate_candidates(&query_str, candidates, &api_key) {
         Ok(res) => res,
         Err(err) => {
@@ -126,9 +134,17 @@ fn main() {
             process::exit(1);
         }
     };
-
+    let eval_ms = eval_start.elapsed().as_millis();
     let elapsed = start_time.elapsed();
-    let top_results: Vec<_> = evaluated.into_iter().take(limit).collect();
+
+    let top_results: Vec<_> = if no_filter {
+        evaluated.into_iter().take(limit).collect()
+    } else {
+        jev::filter_weak(evaluated)
+            .into_iter()
+            .take(limit)
+            .collect()
+    };
 
     if json_mode {
         println!("{}", serde_json::to_string_pretty(&top_results).unwrap());
@@ -136,9 +152,11 @@ fn main() {
     }
 
     println!(
-        "Found {} candidates evaluated in {:.0}ms via TypeSafe Jev:\n",
+        "Found {} candidates evaluated in {:.0}ms via TypeSafe Jev (search {:.0}ms + eval {:.0}ms):\n",
         top_results.len(),
-        elapsed.as_millis()
+        elapsed.as_millis(),
+        search_ms,
+        eval_ms
     );
 
     for (rank, item) in top_results.iter().enumerate() {
@@ -155,11 +173,30 @@ fn main() {
             best_tag
         );
         println!(
-            "    \x1b[33m⭐ {}\x1b[0m | \x1b[35m{}\x1b[0m | Updated: {}",
-            format_num(item.candidate.stars),
+            "    {} | \x1b[35m{}\x1b[0m | Updated: {}",
+            if item.candidate.ecosystem == "crates.io" {
+                format!("⬇ {}", format_num(item.candidate.downloads))
+            } else {
+                format!("⭐ {}", format_num(item.candidate.stars))
+            },
             item.candidate.license,
-            item.candidate.updated_at.chars().take(10).collect::<String>()
+            item.candidate
+                .updated_at
+                .chars()
+                .take(10)
+                .collect::<String>()
         );
+        if !item.candidate.topics.is_empty() {
+            println!(
+                "    \x1b[90m{}\x1b[0m",
+                item.candidate
+                    .topics
+                    .iter()
+                    .map(|t| format!("#{}", t))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            );
+        }
         println!("    {}", item.candidate.description);
         println!(
             "    Fit: \x1b[32m{:.1}/4.0\x1b[0m (Conf: {:.2}) | Active: \x1b[34m{:.0}%\x1b[0m",
@@ -168,7 +205,10 @@ fn main() {
             item.is_modern * 100.0
         );
         println!("    URL: \x1b[4m{}\x1b[0m", item.candidate.url);
-        println!("    \x1b[90mCommand:\x1b[0m {}\n", item.candidate.install_cmd);
+        println!(
+            "    \x1b[90mCommand:\x1b[0m {}\n",
+            item.candidate.install_cmd
+        );
     }
 }
 
