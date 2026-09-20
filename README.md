@@ -29,7 +29,7 @@ When developers and AI coding agents ask LLMs for open-source libraries, general
 
 `jev-scout` solves this by decoupling discovery from decision:
 - **Grounding first:** Queries real package registries (GitHub REST API, crates.io) to fetch actual live metadata.
-- **System One scoring:** Uses TypeSafe AI's `jev-latest` in a single speculative fan-out call (~120ms) to score architectural fit, license suitability, and maintenance freshness.
+- **System One scoring:** Uses TypeSafe AI's `jev-latest` in a single speculative fan-out call (~1s API floor) to score architectural fit, license suitability, and maintenance freshness.
 - **Zero hallucinated packages:** You only get verified, installable repositories with exact stars, licenses, and clone commands.
 - **Dual surface:** Works as an interactive terminal CLI for developers and as a stdio MCP server for autonomous coding agents (Claude Code, Antigravity).
 
@@ -72,7 +72,24 @@ jev-scout "headless browser without chromium" --ecosystem rust
 
 # Output raw JSON for scripts and agents
 jev-scout "token efficient grep for coding agents" --json
+
+# Show all candidates, skip weak-match filtering
+jev-scout "sqlite tui" --no-filter
 ```
+
+### MCP Server (for AI coding agents)
+
+Start jev-scout as a stdio MCP server exposing the `scout_repos` tool, then point any MCP client at it:
+
+```bash
+# Claude Code
+claude mcp add jev-scout -- bash -c "export TYPESAFE_API_KEY=$TYPESAFE_API_KEY && jev-scout --mcp"
+
+# pi
+# add an mcpServers entry: {"command": "jev-scout", "args": ["--mcp"], "env": {"TYPESAFE_API_KEY": "..."}}
+```
+
+The `scout_repos` tool takes `query` (required), plus optional `ecosystem` (`all`/`github`/`crates`), `limit` (1-10), and `strict` (filter weak matches, default true). Results include `structuredContent` for typed consumption.
 
 ---
 
@@ -85,7 +102,7 @@ User Query: "fast sqlite tui in rust"
    │      Pulls top candidate repos with stars, licenses, and commit dates.
    │
    ├─► 2. Speculative Fan-out Call (POST https://api.typesafe.ai/v1/systemone)
-   │      Evaluates all candidates in 120ms with typed primitives:
+   │      Evaluates all candidates in a single ~1s call with typed primitives:
    │      - Score(fit): 1 (unrelated) to 4 (exact architectural fit)
    │      - Noul(modern): Calibrated probability of active maintenance
    │      - Choice(best_match): Single top candidate
@@ -104,6 +121,7 @@ User Query: "fast sqlite tui in rust"
 | `--ecosystem` | `-e` | `all` | Target ecosystem (`all`, `github`, `crates`) |
 | `--limit` | `-n` | `5` | Maximum number of ranked results to return |
 | `--json` | `-j` | `false` | Output machine-readable JSON to stdout |
+| `--no-filter` | | `false` | Show all candidates, skip weak-match filtering |
 | `--mcp` | | `false` | Start as a stdio Model Context Protocol (MCP) server |
 | `--help` | `-h` | | Print help information |
 | `--version` | `-v` | | Print version |
@@ -130,6 +148,14 @@ jev-scout/
 ```
 
 ---
+
+## Latency (honest numbers)
+
+Measured live on an Intel Core i3 / Windows 11 / broadband, against the real APIs:
+
+- Cold (new process): ~2.0-2.3s. The floor is two serial external legs: GitHub search API ~0.9s + Jev API ~1.0s (raw curl floor of 1.0s even for a single question). Search runs in parallel threads; the Jev call is a single fan-out request.
+- Warm (MCP session repeat, TTL 60s caches): ~0.3s. Both search results and Jev evaluations are cached in-process.
+- Filters and ranking run instantly once candidates are fetched.
 
 ## Non-Goals
 
