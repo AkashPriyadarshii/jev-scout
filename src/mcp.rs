@@ -3,6 +3,9 @@ use crate::search::search_candidates;
 use serde_json::{json, Value};
 use std::io::{self, BufRead, Write};
 
+const PROTOCOL_VERSION: &str = "2025-03-26";
+const SUPPORTED_PROTOCOLS: &[&str] = &["2024-11-05", "2025-03-26", "2025-06-18"];
+
 pub fn run_mcp_server(api_key: &str) -> io::Result<()> {
     let stdin = io::stdin();
     let mut stdout = io::stdout();
@@ -18,30 +21,49 @@ pub fn run_mcp_server(api_key: &str) -> io::Result<()> {
             Err(_) => continue,
         };
 
-        let id = request.get("id").cloned().unwrap_or(Value::Null);
-        let method = request
-            .get("method")
-            .and_then(|m| m.as_str())
-            .unwrap_or("");
+        // Notifications have no id and must never be answered.
+        if request.get("id").is_none() {
+            continue;
+        }
+
+        let id = request["id"].clone();
+        let method = request.get("method").and_then(|m| m.as_str()).unwrap_or("");
 
         match method {
             "initialize" => {
+                // Negotiate: echo the client protocol version when supported,
+                // otherwise fall back to our newest supported one.
+                let requested = request
+                    .pointer("/params/protocolVersion")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let version = if SUPPORTED_PROTOCOLS.contains(&requested) {
+                    requested
+                } else {
+                    PROTOCOL_VERSION
+                };
+
                 let response = json!({
                     "jsonrpc": "2.0",
                     "id": id,
                     "result": {
-                        "protocolVersion": "2024-11-05",
+                        "protocolVersion": version,
                         "capabilities": {
-                            "tools": {}
+                            "tools": { "listChanged": false }
                         },
                         "serverInfo": {
                             "name": "jev-scout",
-                            "version": "0.1.0"
+                            "version": env!("CARGO_PKG_VERSION")
                         }
                     }
                 });
-                writeln!(stdout, "{}", serde_json::to_string(&response)?)?;
-                stdout.flush()?;
+                respond(&mut stdout, &response)?;
+            }
+            "ping" => {
+                respond(
+                    &mut stdout,
+                    &json!({ "jsonrpc": "2.0", "id": id, "result": {} }),
+                )?;
             }
             "tools/list" => {
                 let response = json!({
@@ -51,7 +73,8 @@ pub fn run_mcp_server(api_key: &str) -> io::Result<()> {
                         "tools": [
                             {
                                 "name": "scout_repos",
-                                "description": "Search and score open-source repositories and crates matching natural-language prompts using TypeSafe Jev System One model. Zero hallucinations, grounded in real GitHub and crates.io metadata.",
+                                "title": "Scout open-source repos and crates",
+                                "description": "Search and score open-source repositories and crates matching natural-language prompts using TypeSafe Jev System One model. Zero hallucinations, grounded in real GitHub and crates.io metadata. Returns ranked candidates with fit score, confidence, maintenance probability, stars/downloads, and install commands.",
                                 "inputSchema": {
                                     "type": "object",
                                     "properties": {
@@ -66,7 +89,13 @@ pub fn run_mcp_server(api_key: &str) -> io::Result<()> {
                                         },
                                         "limit": {
                                             "type": "number",
+                                            "minimum": 1,
+                                            "maximum": 10,
                                             "description": "Maximum number of ranked results to return (default 5)."
+                                        },
+                                        "strict": {
+                                            "type": "boolean",
+                                            "description": "Filter out weak matches (fit < 2.5 or confidence < 0.5). Default true."
                                         }
                                     },
                                     "required": ["query"]
@@ -75,89 +104,118 @@ pub fn run_mcp_server(api_key: &str) -> io::Result<()> {
                         ]
                     }
                 });
-                writeln!(stdout, "{}", serde_json::to_string(&response)?)?;
-                stdout.flush()?;
+                respond(&mut stdout, &response)?;
             }
             "tools/call" => {
                 let tool_name = request
-                    .get("params")
-                    .and_then(|p| p.get("name"))
+                    .pointer("/params/name")
                     .and_then(|n| n.as_str())
                     .unwrap_or("");
+                let args = request
+                    .pointer("/params/arguments")
+                    .cloned()
+                    .unwrap_or(json!({}));
 
-                if tool_name == "scout_repos" {
-                    let args = request
-                        .get("params")
-                        .and_then(|p| p.get("arguments"))
-                        .cloned()
-                        .unwrap_or(json!({}));
+                if tool_name != "scout_repos" {
+                    respond(
+                        &mut stdout,
+                        &json!({
+                            "jsonrpc": "2.0",
+                            "id": id,
+                            "error": { "code": -32601, "message": format!("Method or tool '{}' not found", tool_name) }
+                        }),
+                    )?;
+                    continue;
+                }
 
-                    let query = args
-                        .get("query")
-                        .and_then(|q| q.as_str())
-                        .unwrap_or("");
+                let query = args
+                    .get("query")
+                    .and_then(|q| q.as_str())
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
 
-                    let ecosystem = args
-                        .get("ecosystem")
-                        .and_then(|e| e.as_str())
-                        .unwrap_or("all");
+                if query.is_empty() {
+                    respond(
+                        &mut stdout,
+                        &json!({
+                            "jsonrpc": "2.0",
+                            "id": id,
+                            "error": { "code": -32602, "message": "Missing required argument: query" }
+                        }),
+                    )?;
+                    continue;
+                }
 
-                    let limit = args
-                        .get("limit")
-                        .and_then(|l| l.as_u64())
-                        .unwrap_or(5) as usize;
+                let ecosystem = args
+                    .get("ecosystem")
+                    .and_then(|e| e.as_str())
+                    .unwrap_or("all");
+                let limit = args
+                    .get("limit")
+                    .and_then(|l| l.as_u64())
+                    .unwrap_or(5)
+                    .clamp(1, 10) as usize;
+                let strict = args.get("strict").and_then(|s| s.as_bool()).unwrap_or(true);
 
-                    let candidates = search_candidates(query, ecosystem, 8);
-                    let evaluated = match evaluate_candidates(query, candidates, api_key) {
-                        Ok(res) => res,
-                        Err(err) => {
-                            let err_resp = json!({
+                let candidates = search_candidates(&query, ecosystem, 8);
+                let evaluated = match evaluate_candidates(&query, candidates, api_key) {
+                    Ok(res) => res,
+                    Err(err) => {
+                        respond(
+                            &mut stdout,
+                            &json!({
                                 "jsonrpc": "2.0",
                                 "id": id,
-                                "error": {
-                                    "code": -32000,
-                                    "message": err
-                                }
-                            });
-                            writeln!(stdout, "{}", serde_json::to_string(&err_resp)?)?;
-                            stdout.flush()?;
-                            continue;
-                        }
-                    };
+                                "error": { "code": -32000, "message": err }
+                            }),
+                        )?;
+                        continue;
+                    }
+                };
 
-                    let top_results: Vec<_> = evaluated.into_iter().take(limit).collect();
-                    let response = json!({
-                        "jsonrpc": "2.0",
-                        "id": id,
-                        "result": {
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": serde_json::to_string_pretty(&top_results)?
-                                }
-                            ]
-                        }
-                    });
-                    writeln!(stdout, "{}", serde_json::to_string(&response)?)?;
-                    stdout.flush()?;
+                let evaluated = if strict {
+                    crate::jev::filter_weak(evaluated)
                 } else {
-                    let err_resp = json!({
-                        "jsonrpc": "2.0",
-                        "id": id,
-                        "error": {
-                            "code": -32601,
-                            "message": format!("Method or tool '{}' not found", tool_name)
-                        }
-                    });
-                    writeln!(stdout, "{}", serde_json::to_string(&err_resp)?)?;
-                    stdout.flush()?;
-                }
+                    evaluated
+                };
+                let top_results: Vec<_> = evaluated.into_iter().take(limit).collect();
+
+                // structuredContent (2025-03-26+) lets agents consume typed data
+                // without re-parsing the display text.
+                let response = json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "result": {
+                        "isError": false,
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": serde_json::to_string_pretty(&top_results)?
+                            }
+                        ],
+                        "structuredContent": top_results
+                    }
+                });
+                respond(&mut stdout, &response)?;
             }
             _ => {
-                // Ignore notifications or unknown methods
+                respond(
+                    &mut stdout,
+                    &json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "error": { "code": -32601, "message": format!("Method '{}' not found", method) }
+                    }),
+                )?;
             }
         }
     }
 
     Ok(())
+}
+
+fn respond(stdout: &mut io::Stdout, response: &Value) -> io::Result<()> {
+    writeln!(stdout, "{}", serde_json::to_string(response)?)?;
+    stdout.flush()
 }

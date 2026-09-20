@@ -7,8 +7,12 @@ pub struct Candidate {
     pub description: String,
     pub url: String,
     pub stars: u64,
+    pub downloads: u64,
     pub license: String,
     pub updated_at: String,
+    pub pushed_at: String,
+    pub language: String,
+    pub topics: Vec<String>,
     pub ecosystem: String,
     pub install_cmd: String,
 }
