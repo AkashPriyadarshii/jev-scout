@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>jev-scout: zero-hallucination repo &amp; crate discovery, soundings not guesses</title>
+<meta name="description" content="jev-scout is a zero-hallucination open-source repo and crate scout for developers and AI agents. Real registry metadata, TypeSafe Jev System One scoring in one fan-out call, ranked verified installs. Rust CLI + MCP.">
+<meta name="keywords" content="repo discovery, crate finder, zero hallucination, typesafe ai, jev, github search, crates.io, rust, cli, mcp-server, coding agents, llm guardrails">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<!--
+CONTRACT jev-scout hydrographic survey office landing (seed 3077fda3, assigned direction 3 of 7)
+THESIS: discovery of open source is surveying unknown waters, so the page is a night chart table: soundings (verified registry depth), shoals (stale repos), survey routes (install paths), Notices to Mariners (honest corrections). It refuses the "find me a library" template: no centered hero over stars, no keyword-search marketing, no fake precision.
+OWN-WORLD: near-black sea ground, teal (#0d9488) as the only verified-sounding ink, chart-white paper for printed display type and graticule, ember orange reserved for the live element, one red pass for shoals, magenta for chart corrections. Compass rose, sextant arcs, dashed survey routes, ghosted outlines for filtered candidates. Type: Bricolage Grotesque display / Instrument Sans body / IBM Plex Mono for soundings only. Radius 0; print geometry on a dark bridge.
+STORY: a developer or agent asks for a library, sees soundings land on the chart with typed scores (not essays), sees the ghosts of what got filtered, believes zero hallucination by construction, installs with cargo in one line.
+FIRST VIEWPORT: chart-table title block (jev-scout in Bricolage 800 + compass rose), live sounding plot FIG A where verified points press down in teal and filtered candidates stay ghosted, primary action `cargo install jev-scout` under the datum line.
+FORM: assigned direction 3 (hydrographic survey office), raised: sticker-album (ghost slots = filtered candidates), letterpress (one red pass for the headline act; condensed bands rewrap), alien-understory (attention-as-light: focused sounding brightens), raku (ember only while live).
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
+-->
+<header class="bridge">
+  <div class="graticule" aria-hidden="true"></div>
+  <nav class="topline">
+    <a class="wordmark" href="#top">jev<span class="teal">-scout</span></a>
+    <div class="topnav">
+      <a href="#why">why</a>
+      <a href="#sounding">sounding table</a>
+      <a href="#oracle">oracle</a>
+      <a href="#notices">notices</a>
+      <a href="#install">install</a>
+    </div>
+    <a class="toplink" href="https://github.com/AkashPriyadarshii/jev-scout" target="_blank" rel="noopener">harbor ↗</a>
+  </nav>
+  <div class="datum"></div>
+  <p class="sheetno">SURVEY CH-01 · GITHUB + CRATES.IO · <span class="ember">LIVE</span></p>
+</header>
+
+<main id="top">
+  <!-- ===== FIRST VIEWPORT: title block + live sounding plot ===== -->
+  <section class="titleblock">
+    <div class="tb-grid">
+      <div class="tb-left">
+        <h1 class="display">jev-scout</h1>
+        <p class="subtitle">Zero-hallucination repo &amp; crate discovery. <span class="chartwhite">We take soundings, not guesses</span>: real registry depth, typed scores, verified install routes.</p>
+        <div class="cta">
+          <code class="install-cmd"><span class="teal">$</span> cargo install jev-scout</code>
+          <a class="btn-primary" href="#install">read the chart ↓</a>
+        </div>
+      </div>
+      <div class="tb-right" aria-hidden="true">
+        <svg class="compass" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="56" fill="none" stroke="currentColor" stroke-opacity="0.35"/>
+          <circle cx="60" cy="60" r="42" fill="none" stroke="currentColor" stroke-opacity="0.2" stroke-dasharray="2 3"/>
+          <g stroke="currentColor" stroke-width="1">
+            <path d="M60 6 L66 54 L60 60 L54 54 Z" fill="currentColor" stroke="none"/>
+            <path d="M60 114 L66 66 L60 60 L54 66 Z" fill="currentColor" fill-opacity="0.3" stroke="none"/>
+            <path d="M6 60 L54 66 L60 60 L54 54 Z" fill="currentColor" fill-opacity="0.3" stroke="none"/>
+            <path d="M114 60 L66 66 L60 60 L66 54 Z" fill="currentColor" fill-opacity="0.3" stroke="none"/>
+            <path d="M60 6 L60 114 M6 60 L114 60" stroke-opacity="0.5"/>
+          </g>
+          <text x="60" y="18" text-anchor="middle" font-size="8" fill="currentColor" fill-opacity="0.7">N</text>
+        </svg>
+        <p class="compass-cap">MAG. NORTH · RETICULE 1:2M</p>
+      </div>
+    </div>
+    <div class="datumline"><span>DATUM</span></div>
+  </section>
+
+  <!-- live mechanism: the chart plots verified soundings; filtered stay ghosted -->
+  <section class="chartsec" aria-label="Live sounding plot">
+    <div class="chart-spec">
+      <div class="chart-head">
+        <span class="fig">FIG A</span>
+        <span class="chart-title">sounding: "fast sqlite tui in rust"</span>
+        <span class="mcp-tag">SCOUT_REPOS</span>
+      </div>
+      <svg class="chart" id="chart" viewBox="0 0 760 300" role="img" aria-label="Sounding plot: verified candidates land as teal points, filtered candidates remain as ghost outlines">
+        <defs>
+          <pattern id="grat" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M40 0H0V40" fill="none" stroke="currentColor" stroke-opacity="0.07"/>
+          </pattern>
+        </defs>
+        <rect width="760" height="300" fill="url(#grat)" opacity="0"/>
+        <g class="plot"></g>
+      </svg>
+      <div class="chart-legend">
+        <span><i class="px verified"></i>verified sounding</span>
+        <span><i class="px ghost"></i>filtered (fit &lt; 2.5)</span>
+      </div>
+      <div class="evallog" id="evallog" aria-live="off"></div>
+      <div class="chart-cap">One fan-out call, five candidates, typed verdicts. Absence is as informative as presence: weak matches stay ghosted, never deleted.</div>
+    </div>
+  </section>
+
+  <!-- ===== WHY ===== -->
+  <section class="why" id="why">
+    <h2 class="h2">LLMs invent packages.<br><span class="teal">We take soundings.</span></h2>
+    <p class="lede">Ask a general model for a library and it will happily recommend a name that never shipped. GitHub keyword search can't parse a concept. A hydrographic chart solves both: every plotted point is a real registry measurement, every hazard is marked.</p>
+    <div class="why-grid">
+      <div class="whyspec">
+        <p class="no">SB-01</p>
+        <h3>Grounding first</h3>
+        <p>Two real registries, one pass: GitHub REST + crates.io. Live metadata only: stars, downloads, pushed_at, language, topics. Nothing imagined.</p>
+      </div>
+      <div class="whyspec">
+        <p class="no">SB-02</p>
+        <h3>One fan-out call</h3>
+        <p>All candidates scored in a single speculative fan-out to TypeSafe Jev System One. Score (fit 1-4), Noul (maintenance probability), Choice (best match). One request, typed answers.</p>
+      </div>
+      <div class="whyspec">
+        <p class="no">SB-03</p>
+        <h3>Deterministic ranking</h3>
+        <p>score × confidence, sorted. Recency decay ×0.9 past 180 days. Weak matches filtered at fit &lt; 2.5 or confidence &lt; 0.5: visible, not silent.</p>
+      </div>
+      <div class="whyspec">
+        <p class="no">SB-04</p>
+        <h3>Dual surface</h3>
+        <p>Terminal CLI for you, stdio MCP for your agent. The same soundings, one JSON-RPC 2.0 contract, structuredContent out.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SOUNDING TABLE ===== -->
+  <section class="sounding" id="sounding">
+    <h2 class="h2">Survey instruments</h2>
+    <p class="lede">Ten flags, charted. Every one returns measurable depth, never an essay.</p>
+    <div class="sounding-table">
+      <div class="st-row"><code>jev-scout "fast sqlite tui in rust"</code><span class="st-cap">conceptual query → ranked verified candidates</span></div>
+      <div class="st-row"><code>-e / --ecosystem all|github|crates</code><span class="st-cap">restrict the survey water</span></div>
+      <div class="st-row"><code>-n / --limit 5</code><span class="st-cap">plot depth max 10</span></div>
+      <div class="st-row"><code>-j / --json</code><span class="st-cap">machine-readable soundings for scripts and agents</span></div>
+      <div class="st-row"><code>--no-filter</code><span class="st-cap">show ghosts too (no one shoots the messenger)</span></div>
+      <div class="st-row"><code>--mcp</code><span class="st-cap">stdio MCP server · scout_repos tool · structuredContent</span></div>
+      <div class="st-row"><code>--help / --version</code><span class="st-cap">the chart legend and datum</span></div>
+    </div>
+  </section>
+
+  <!-- ===== ORACLE ===== -->
+  <section class="oracle" id="oracle">
+    <h2 class="h2">The oracle is a sextant, not a novelist</h2>
+    <p class="lede">Jev answers machine-native questions with machine-native types. It will not write you a confident paragraph you then have to verify.</p>
+    <div class="oracle-grid">
+      <div class="ocell"><span class="oprim">Score</span><span class="odesc">architectural fit, 1-4: does this repo actually do the thing</span></div>
+      <div class="ocell"><span class="oprim">Noul</span><span class="odesc">calibrated probability of active maintenance, from pushed_at and topics</span></div>
+      <div class="ocell"><span class="oprim">Choice</span><span class="odesc">best_match: the single candidate the survey would send you to</span></div>
+      <div class="ocell"><span class="oprim">Fan-out</span><span class="odesc">one state, many questions, one request. ~10x fewer round trips</span></div>
+    </div>
+    <p class="oracle-note">Jev refuses arithmetic and word counts, and it is right to: the CLI does the math, Jev does the judgment. That split is the whole architecture.</p>
+  </section>
+
+  <!-- ===== NOTICES TO MARINERS ===== -->
+  <section class="notices" id="notices">
+    <h2 class="h2">Notices to Mariners</h2>
+    <p class="lede">Corrections are how a chart earns trust. These are the honest numbers, measured, not marketed.</p>
+    <div class="notices-grid">
+      <div class="nnotice">
+        <p class="nk">LATENCY: COLD</p>
+        <p class="nv">~2.0-2.3s</p>
+        <p class="nf">Two serial external legs: GitHub API ~0.85s + Jev ~1.0s floor. No 1.5s marketing figure here.</p>
+      </div>
+      <div class="nnotice">
+        <p class="nk">LATENCY: WARM</p>
+        <p class="nv">~0.3s</p>
+        <p class="nf">Same process, TTL 60s caches on search and evaluation. This is the agent-relevant number.</p>
+      </div>
+      <div class="nnotice">
+        <p class="nk">RECENCY DECAY</p>
+        <p class="nv">×0.9 / 180d</p>
+        <p class="nf">Stale candidates lose weight. Julian-day math in host code: Jev never counts.</p>
+      </div>
+      <div class="nnotice">
+        <p class="nk">FILTER THRESHOLD</p>
+        <p class="nv">fit 2.5 / conf 0.5</p>
+        <p class="nf">Below the line, ghosted on the chart. <code>--no-filter</code> shows the ghosts.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== INSTALL ===== -->
+  <section class="install" id="install">
+    <h2 class="h2">Set up in two lines</h2>
+    <div class="install-code">
+      <p><span class="dim"># 1: install</span><br><span class="teal">$</span> cargo install jev-scout</p>
+      <p><span class="dim"># 2: free oracle key</span><br><span class="teal">$</span> export TYPESAFE_API_KEY=your_key_here</p>
+      <p><span class="dim"># 3: agent surface (Claude Code)</span><br><span class="teal">$</span> claude mcp add jev-scout -- bash -c "export TYPESAFE_API_KEY=$TYPESAFE_API_KEY &amp;&amp; jev-scout --mcp"</p>
+    </div>
+    <p class="install-note">One static binary under 5MB. No SQLite, no Chromium, no browser automation, no paid search proxy, no text generation. Verified soundings only.</p>
+    <div class="install-cta">
+      <a class="btn-primary" href="https://github.com/AkashPriyadarshii/jev-scout" target="_blank" rel="noopener">enter the harbor ↗</a>
+      <a class="btn-ghost" href="https://crates.io/crates/jev-scout" target="_blank" rel="noopener">crates.io</a>
+    </div>
+  </section>
+</main>
+
+<footer class="quay">
+  <div class="datum"></div>
+  <div class="foot-wrap">
+    <div class="foot-row">
+      <h3 class="foot-h">Ecosystem</h3>
+      <ul>
+        <li><a href="https://github.com/AkashPriyadarshii/design-genius" target="_blank" rel="noopener">design-genius</a></li>
+        <li><a href="https://github.com/AkashPriyadarshii/akash-design-engineering" target="_blank" rel="noopener">akash-design-engineering</a></li>
+        <li><a href="https://github.com/AkashPriyadarshii/tdlib-android" target="_blank" rel="noopener">tdlib-android</a></li>
+        <li><a href="https://github.com/AkashPriyadarshii/kharcha" target="_blank" rel="noopener">kharcha</a></li>
+      </ul>
+    </div>
+    <div class="foot-row">
+      <h3 class="foot-h">Author</h3>
+      <ul>
+        <li><a href="https://github.com/AkashPriyadarshii" target="_blank" rel="noopener">Akash Priyadarshi, Patna, Bihar, India</a></li>
+        <li><a href="https://akashpriyadarshi.vercel.app" target="_blank" rel="noopener">portfolio</a></li>
+        <li><a href="https://linkedin.com/in/akash-priyadarshi-1aa51b37a" target="_blank" rel="noopener">linkedin</a></li>
+        <li><a href="https://akashpriyadarshii.github.io/Resume/" target="_blank" rel="noopener">resume</a></li>
+      </ul>
+    </div>
+    <div class="foot-row">
+      <h3 class="foot-h">Social</h3>
+      <ul>
+        <li><a href="https://x.com/Akash__ydv001" target="_blank" rel="noopener">X / Twitter</a></li>
+        <li><a href="https://www.threads.net/@akash.priyadarshii" target="_blank" rel="noopener">Threads</a></li>
+        <li><a href="https://www.instagram.com/akash.priyadarshii/" target="_blank" rel="noopener">Instagram</a></li>
+        <li><a href="https://reddit.com/user/DragonfruitWeak2801" target="_blank" rel="noopener">Reddit</a></li>
+      </ul>
+    </div>
+  </div>
+  <p class="foot-note">jev-scout: soundings, not guesses. <span class="teal">zero-hallucination repo and crate discovery for developers and agents.</span></p>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
