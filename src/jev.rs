@@ -34,12 +34,12 @@ pub fn evaluate_candidates(
         }
     }
 
-    let evaluated = if candidates.len() <= 5 {
+    let evaluated = if candidates.len() <= 3 {
         evaluate_via_api(query, &candidates, api_key)?
     } else {
         // Jev drops questions past ~15 per call: chunk, fan out per chunk, merge.
         let mut all = Vec::new();
-        for chunk in candidates.chunks(5) {
+        for chunk in candidates.chunks(3) {
             all.extend(evaluate_via_api(query, chunk, api_key)?);
         }
         all
@@ -74,7 +74,7 @@ fn evaluate_via_api(
             format!("fit_{}", idx),
             json!({
                 "type": "score",
-                "instructions": format!("Rate how well '{}' ({}) satisfies the user prompt: '{}'", c.name, c.description, query),
+                "instructions": format!("Relevance of '{}' to '{}'?", c.name, query),
                 "criteria": [
                     "Unrelated or completely different functional domain",
                     "Loosely related or missing core requested features/language",
@@ -84,12 +84,27 @@ fn evaluate_via_api(
             }),
         );
 
+        // Per-candidate Docs Score question
+        questions.insert(
+            format!("doc_{}", idx),
+            json!({
+                "type": "score",
+                "instructions": format!("Docs quality of '{}'?", c.name),
+                "criteria": [
+                    "No usable description",
+                    "One-line or vague description",
+                    "Clear description with purpose",
+                    "Excellent docs with examples and links"
+                ]
+            }),
+        );
+
         // Per-candidate Modern/Active Maintenance Noul question
         questions.insert(
             format!("modern_{}", idx),
             json!({
                 "type": "noul",
-                "instructions": format!("Based on metadata (stars: {}, downloads: {}, pushed/updated: {}, language: {}, topics: {:?}), is '{}' an actively maintained modern tool?", c.stars, c.downloads, c.pushed_at, c.language, c.topics, c.name),
+                "instructions": format!("Is '{}' actively maintained?", c.name),
                 "criteria": {
                     "true": "Actively maintained with modern tooling",
                     "false": "Deprecated, abandoned, or legacy code"
@@ -103,7 +118,7 @@ fn evaluate_via_api(
         "best_match".to_string(),
         json!({
             "type": "choice",
-            "instructions": format!("Which candidate is the single best recommendation for: '{}'?", query),
+            "instructions": format!("Single best for '{}'?", query),
             "criteria": choice_criteria
         }),
     );
@@ -164,26 +179,34 @@ fn evaluate_via_api(
     let mut evaluated = Vec::new();
 
     for (idx, c) in candidates.iter().enumerate() {
-        let fit_ans = answers.get(&format!("fit_{}", idx));
-        let modern_ans = answers.get(&format!("modern_{}", idx));
-
-        // Jev occasionally drops a per-candidate question: skip that
-        // candidate loudly instead of fabricating a score or killing the run.
-        let (fit_score, confidence, is_modern) = match (fit_ans, modern_ans) {
-            (Some(f), Some(m)) => {
-                let s = f["score"].as_f64().filter(|s| (1.0..=4.0).contains(s));
-                let cf = f["confidence"].as_f64().filter(|cf| (0.0..=1.0).contains(cf));
-                let n = m["noul"].as_f64().filter(|n| (0.0..=1.0).contains(n));
-                match (s, cf, n) {
-                    (Some(s), Some(cf), Some(n)) => (s, cf, n),
-                    _ => {
-                        eprintln!("Warning: Jev answer for '{}' malformed, skipping.", c.id);
-                        continue;
-                    }
+        // Composite fit: relevance, maturity, docs combined with code weights.
+        // A dropped dimension skips the candidate loudly, never defaults.
+        let prefixes = ["fit", "doc"];
+        let mut fit_score = 0.0;
+        let mut confidence = 1.0f64;
+        let mut ok = true;
+        for (i, w) in crate::policy::FIT_WEIGHTS.iter().map(|(_, w)| w).enumerate() {
+            let ans = answers.get(&format!("{}_{}", prefixes[i], idx));
+            match ans.and_then(|v| v["score"].as_f64()).filter(|s| (0.0..=3.0).contains(s)) {
+                Some(s) => fit_score += s * w,
+                None => {
+                    eprintln!("Warning: Jev {}_{} for '{}' malformed, skipping.", prefixes[i], idx, c.id);
+                    ok = false;
+                    break;
                 }
             }
-            _ => {
-                eprintln!("Warning: Jev skipped '{}', skipping.", c.id);
+            confidence = confidence.min(
+                ans.and_then(|v| v["confidence"].as_f64()).unwrap_or(0.0),
+            );
+        }
+        if !ok {
+            continue;
+        }
+        let modern_ans = answers.get(&format!("modern_{}", idx));
+        let is_modern = match modern_ans.and_then(|v| v["noul"].as_f64()).filter(|n| (0.0..=1.0).contains(n)) {
+            Some(n) => n,
+            None => {
+                eprintln!("Warning: Jev modern_{} for '{}' malformed, skipping.", idx, c.id);
                 continue;
             }
         };
@@ -196,7 +219,7 @@ fn evaluate_via_api(
         } else {
             &c.pushed_at
         });
-        let weighted_rank = fit_score * confidence * if stale { 0.9 } else { 1.0 };
+        let weighted_rank = fit_score * confidence * if stale { crate::policy::STALE_PENALTY } else { 1.0 };
 
         evaluated.push(EvaluatedCandidate {
             candidate: c.clone(),
@@ -218,10 +241,9 @@ fn evaluate_via_api(
     Ok(evaluated)
 }
 
-/// Drop weak matches: fit below 2.5 or confidence below 0.5 gets filtered out
-/// so low-quality recommendations never reach the user. Honest default.
+/// Drop weak matches below policy floors so low-quality picks never reach the user.
 pub fn filter_weak(mut evaluated: Vec<EvaluatedCandidate>) -> Vec<EvaluatedCandidate> {
-    evaluated.retain(|e| e.fit_score >= 2.5 && e.confidence >= 0.5);
+    evaluated.retain(|e| e.fit_score >= crate::policy::MIN_FIT && e.confidence >= crate::policy::MIN_CONFIDENCE);
     evaluated
 }
 
@@ -244,7 +266,7 @@ fn is_stale_180d(iso: &str) -> bool {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|s| s.as_secs() as i64 / 86_400)
         .unwrap_or(0);
-    now_days - (days - 2440588) > 180
+    now_days - (days - 2440588) > crate::policy::STALE_DAYS
 }
 
 fn julian_day(y: i64, m: i64, d: i64) -> i64 {
@@ -291,7 +313,7 @@ mod tests {
             weighted_rank: fit * conf,
             is_best_match: false,
         };
-        let out = filter_weak(vec![mk(3.0, 0.9), mk(2.4, 0.9), mk(3.0, 0.4)]);
+        let out = filter_weak(vec![mk(2.5, 0.9), mk(1.4, 0.9), mk(2.5, 0.4)]);
         assert_eq!(out.len(), 1);
     }
 }

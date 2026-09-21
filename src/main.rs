@@ -1,6 +1,8 @@
 mod jev;
 mod mcp;
+mod policy;
 mod search;
+mod trend;
 mod types;
 
 use lexopt::prelude::*;
@@ -18,7 +20,7 @@ ARGS:
     <QUERY>                 Natural language description of what you are searching for
 
 OPTIONS:
-    -e, --ecosystem <NAME>  Target ecosystem: 'all' (default), 'github', or 'crates'
+    -e, --ecosystem <NAME>  Target ecosystem: 'all' (default), 'github', 'crates', or 'web'
     -n, --limit <NUM>       Maximum results to show (default: 5)
     -j, --json              Output machine-readable JSON to stdout
         --no-filter         Show all candidates, skip weak-match filtering
@@ -171,6 +173,13 @@ fn main() {
         eval_ms
     );
 
+    if let Some(first) = top_results.first() {
+        match trend::record(&query_str, &first.candidate.id) {
+            Some(prev) => println!("  Previously topped by: {}\n", prev),
+            None => println!("  First recorded top pick for this query.\n"),
+        }
+    }
+
     for (rank, item) in top_results.iter().enumerate() {
         let best_tag = if item.is_best_match {
             " \x1b[32;1m[BEST MATCH]\x1b[0m"
@@ -211,7 +220,7 @@ fn main() {
         }
         println!("    {}", item.candidate.description);
         println!(
-            "    Fit: \x1b[32m{:.1}/4.0\x1b[0m (Conf: {:.2}) | Active: \x1b[34m{:.0}%\x1b[0m",
+            "    Fit: \x1b[32m{:.1}/3.0\x1b[0m (Conf: {:.2}) | Active: \x1b[34m{:.0}%\x1b[0m",
             item.fit_score,
             item.confidence,
             item.is_modern * 100.0

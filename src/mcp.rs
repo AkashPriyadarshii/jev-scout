@@ -84,7 +84,7 @@ pub fn run_mcp_server(api_key: &str) -> io::Result<()> {
                                         },
                                         "ecosystem": {
                                             "type": "string",
-                                            "enum": ["all", "github", "crates"],
+                                            "enum": ["all", "github", "crates", "web"],
                                             "description": "Filter by target ecosystem. Defaults to 'all'."
                                         },
                                         "limit": {
@@ -95,7 +95,7 @@ pub fn run_mcp_server(api_key: &str) -> io::Result<()> {
                                         },
                                         "strict": {
                                             "type": "boolean",
-                                            "description": "Filter out weak matches (fit < 2.5 or confidence < 0.5). Default true."
+                                            "description": "Filter out weak matches (fit < 1.5 or confidence < 0.5). Default true."
                                         }
                                     },
                                     "required": ["query"]
@@ -148,14 +148,14 @@ pub fn run_mcp_server(api_key: &str) -> io::Result<()> {
                 }
 
                 let ecosystem = match args.get("ecosystem").and_then(|e| e.as_str()).unwrap_or("all") {
-                    e @ ("all" | "github" | "crates") => e,
+                    e @ ("all" | "github" | "crates" | "web") => e,
                     other => {
                         respond(
                             &mut stdout,
                             &json!({
                                 "jsonrpc": "2.0",
                                 "id": id,
-                                "error": { "code": -32602, "message": format!("Invalid ecosystem '{}'. Use all, github, or crates.", other) }
+                                "error": { "code": -32602, "message": format!("Invalid ecosystem '{}'. Use all, github, crates, or web.", other) }
                             }),
                         )?;
                         continue;
