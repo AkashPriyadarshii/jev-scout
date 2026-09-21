@@ -186,6 +186,13 @@ Patna, Bihar, India
 - LinkedIn: [akash-priyadarshi-1aa51b37a](https://linkedin.com/in/akash-priyadarshi-1aa51b37a)  
 - Resume: [akashpriyadarshii.github.io/Resume](https://akashpriyadarshii.github.io/Resume/)
 
+
+
+<p align="center">
+  <img src="https://api.star-history.com/svg?repos=AkashPriyadarshii/jev-scout&type=Date" width="600" alt="star history" />
+</p>
+
+
 ## Social
 
 - X / Twitter: [@Akash__ydv001](https://x.com/Akash__ydv001)  
