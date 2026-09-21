@@ -34,7 +34,16 @@ pub fn evaluate_candidates(
         }
     }
 
-    let evaluated = evaluate_via_api(query, &candidates, api_key)?;
+    let evaluated = if candidates.len() <= 5 {
+        evaluate_via_api(query, &candidates, api_key)?
+    } else {
+        // Jev drops questions past ~15 per call: chunk, fan out per chunk, merge.
+        let mut all = Vec::new();
+        for chunk in candidates.chunks(5) {
+            all.extend(evaluate_via_api(query, chunk, api_key)?);
+        }
+        all
+    };
 
     if let Ok(mut guard) = EVAL_CACHE.lock() {
         let map = guard.get_or_insert_with(EvalCache::new);
@@ -100,7 +109,7 @@ fn evaluate_via_api(
     );
 
     let payload = json!({
-        "model": "jev-latest",
+        "model": "jev-1.13.0",
         "state": {
             "query": query,
             "candidate_count": candidates.len(),
@@ -140,12 +149,17 @@ fn evaluate_via_api(
         .into_json()
         .map_err(|e| format!("Failed to parse Jev API response: {}", e))?;
 
-    let answers = jev_res.answers.unwrap_or_default();
+    let answers = jev_res
+        .answers
+        .ok_or_else(|| "Jev response missing answers".to_string())?;
     let best_match_id = answers
         .get("best_match")
         .and_then(|v| v["choice"].as_str())
-        .unwrap_or("")
-        .to_string();
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| {
+            eprintln!("Warning: Jev best_match missing, no top pick flagged.");
+            String::new()
+        });
 
     let mut evaluated = Vec::new();
 
@@ -153,13 +167,26 @@ fn evaluate_via_api(
         let fit_ans = answers.get(&format!("fit_{}", idx));
         let modern_ans = answers.get(&format!("modern_{}", idx));
 
-        let fit_score = fit_ans.and_then(|v| v["score"].as_f64()).unwrap_or(2.5);
-
-        let confidence = fit_ans
-            .and_then(|v| v["confidence"].as_f64())
-            .unwrap_or(0.8);
-
-        let is_modern = modern_ans.and_then(|v| v["noul"].as_f64()).unwrap_or(0.7);
+        // Jev occasionally drops a per-candidate question: skip that
+        // candidate loudly instead of fabricating a score or killing the run.
+        let (fit_score, confidence, is_modern) = match (fit_ans, modern_ans) {
+            (Some(f), Some(m)) => {
+                let s = f["score"].as_f64().filter(|s| (1.0..=4.0).contains(s));
+                let cf = f["confidence"].as_f64().filter(|cf| (0.0..=1.0).contains(cf));
+                let n = m["noul"].as_f64().filter(|n| (0.0..=1.0).contains(n));
+                match (s, cf, n) {
+                    (Some(s), Some(cf), Some(n)) => (s, cf, n),
+                    _ => {
+                        eprintln!("Warning: Jev answer for '{}' malformed, skipping.", c.id);
+                        continue;
+                    }
+                }
+            }
+            _ => {
+                eprintln!("Warning: Jev skipped '{}', skipping.", c.id);
+                continue;
+            }
+        };
 
         let is_best = c.id == best_match_id;
         // Recency decay: stale (no push/update in 180 days) loses rank weight.
@@ -212,11 +239,12 @@ fn is_stale_180d(iso: &str) -> bool {
         return false;
     }
     let days = julian_day(y, m, d);
+    // JDN of unix epoch is 2440588; now_days counts from epoch.
     let now_days = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|s| s.as_secs() as i64 / 86_400)
         .unwrap_or(0);
-    now_days - days > 180
+    now_days - (days - 2440588) > 180
 }
 
 fn julian_day(y: i64, m: i64, d: i64) -> i64 {
@@ -224,4 +252,46 @@ fn julian_day(y: i64, m: i64, d: i64) -> i64 {
     let a = y / 100;
     let b = 2 - a + a / 4;
     (36525 * (y + 4716)) / 100 + (306 * (m + 1)) / 10 + d + b - 1524
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stale_boundary() {
+        assert!(!is_stale_180d(""));
+        assert!(!is_stale_180d("not-a-date"));
+        assert!(!is_stale_180d("2026-09-21T00:00:00Z"));
+        assert!(is_stale_180d("2020-01-01T00:00:00Z"));
+        assert!(is_stale_180d("2020-01-01"));
+    }
+
+    #[test]
+    fn weak_filter_thresholds() {
+        let mk = |fit: f64, conf: f64| EvaluatedCandidate {
+            candidate: crate::types::Candidate {
+                id: "x".into(),
+                name: "x".into(),
+                description: "".into(),
+                url: "".into(),
+                stars: 0,
+                downloads: 0,
+                license: "".into(),
+                updated_at: "".into(),
+                pushed_at: "".into(),
+                language: "".into(),
+                topics: vec![],
+                ecosystem: "".into(),
+                install_cmd: "".into(),
+            },
+            fit_score: fit,
+            is_modern: 1.0,
+            confidence: conf,
+            weighted_rank: fit * conf,
+            is_best_match: false,
+        };
+        let out = filter_weak(vec![mk(3.0, 0.9), mk(2.4, 0.9), mk(3.0, 0.4)]);
+        assert_eq!(out.len(), 1);
+    }
 }

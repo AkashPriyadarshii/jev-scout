@@ -88,7 +88,7 @@ pub fn run_mcp_server(api_key: &str) -> io::Result<()> {
                                             "description": "Filter by target ecosystem. Defaults to 'all'."
                                         },
                                         "limit": {
-                                            "type": "number",
+                                            "type": "integer",
                                             "minimum": 1,
                                             "maximum": 10,
                                             "description": "Maximum number of ranked results to return (default 5)."
@@ -147,10 +147,20 @@ pub fn run_mcp_server(api_key: &str) -> io::Result<()> {
                     continue;
                 }
 
-                let ecosystem = args
-                    .get("ecosystem")
-                    .and_then(|e| e.as_str())
-                    .unwrap_or("all");
+                let ecosystem = match args.get("ecosystem").and_then(|e| e.as_str()).unwrap_or("all") {
+                    e @ ("all" | "github" | "crates") => e,
+                    other => {
+                        respond(
+                            &mut stdout,
+                            &json!({
+                                "jsonrpc": "2.0",
+                                "id": id,
+                                "error": { "code": -32602, "message": format!("Invalid ecosystem '{}'. Use all, github, or crates.", other) }
+                            }),
+                        )?;
+                        continue;
+                    }
+                };
                 let limit = args
                     .get("limit")
                     .and_then(|l| l.as_u64())

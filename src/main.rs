@@ -51,10 +51,20 @@ fn main() {
     }) {
         match arg {
             Short('e') | Long("ecosystem") => {
-                ecosystem = parser.value().unwrap().string().unwrap();
+                ecosystem = parser
+                    .value()
+                    .ok()
+                    .and_then(|v| v.string().ok())
+                    .unwrap_or_else(|| "all".to_string());
             }
             Short('n') | Long("limit") => {
-                limit = parser.value().unwrap().parse().unwrap_or(5);
+                limit = parser
+                    .value()
+                    .ok()
+                    .and_then(|v| v.string().ok())
+                    .and_then(|s| s.parse::<usize>().ok())
+                    .map(|n| n.clamp(1, 10))
+                    .unwrap_or(5);
             }
             Short('j') | Long("json") => {
                 json_mode = true;
