@@ -21,6 +21,8 @@ Keywords: typesafe-ai, jev, github-search, crates-io, rust, cli, mcp-server, cod
 
 </div>
 
+[![stars](https://img.shields.io/github/stars/AkashPriyadarshii/jev-scout?style=flat-square&label=stars)](https://github.com/AkashPriyadarshii/jev-scout/stargazers) [![crates.io](https://img.shields.io/crates/v/jev-scout?style=flat-square)](https://crates.io/crates/jev-scout) [![downloads](https://img.shields.io/crates/d/jev-scout?style=flat-square)](https://crates.io/crates/jev-scout) [![release](https://img.shields.io/github/v/release/AkashPriyadarshii/jev-scout?style=flat-square&label=release)](https://github.com/AkashPriyadarshii/jev-scout/releases)
+
 ---
 
 ## Why
