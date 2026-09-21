@@ -215,8 +215,80 @@ pub fn search_crates_io(query: &str, limit: usize) -> Result<Vec<Candidate>, Str
     Ok(candidates)
 }
 
-pub fn search_candidates(query: &str, ecosystem: &str, total_limit: usize) -> Vec<Candidate> {
-    let key = format!(
+/// DuckDuckGo HTML web results: docs, blogs, tutorials beyond code homes.
+/// Empty parse = loud error, never fake rows (bot challenges return 200).
+pub fn search_duckduckgo(query: &str, limit: usize) -> Result<Vec<Candidate>, String> {
+    let mut candidates = Vec::new();
+    let form = format!("q={}&kl=us-en", encode_query(query));
+    let html = ureq::post("https://html.duckduckgo.com/html/")
+        .set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+        .set("Content-Type", "application/x-www-form-urlencoded")
+        .timeout(Duration::from_secs(8))
+        .send_string(&form)
+        .map_err(|e| format!("DuckDuckGo search failed: {}", e))?
+        .into_string()
+        .map_err(|e| format!("DuckDuckGo returned bad body: {}", e))?;
+
+    let lower = html.to_lowercase();
+    if lower.contains("anomaly") || lower.contains("captcha") {
+        return Err("DuckDuckGo bot challenge, no results recorded.".to_string());
+    }
+
+    for block in html.split("result__title").skip(1).take(limit) {
+        if let Some(c) = parse_ddg_block(block) {
+            candidates.push(c);
+        }
+    }
+
+    if candidates.is_empty() {
+        return Err("DuckDuckGo returned no parseable results, possibly blocked.".to_string());
+    }
+    Ok(candidates)
+}
+
+fn parse_ddg_block(block: &str) -> Option<Candidate> {
+    let href = block.find("href=\"").and_then(|s| {
+        let rest = &block[s + 6..];
+        rest.find('"').map(|e| rest[..e].to_string())
+    })?;
+    let url = if let Some(pos) = href.find("uddg=") {
+        let rem = &href[pos + 5..];
+        rem[..rem.find('&').unwrap_or(rem.len())].to_string()
+    } else if href.starts_with("http") {
+        href
+    } else {
+        return None;
+    };
+    let title = block
+        .find('>')
+        .map(|s| {
+            let rest = &block[s + 1..];
+            rest[..rest.find('<').unwrap_or(rest.len())]
+                .trim()
+                .to_string()
+        })
+        .unwrap_or_default();
+    if title.is_empty() || url.is_empty() {
+        return None;
+    }
+    Some(Candidate {
+        id: format!("web:{}", url),
+        name: title,
+        description: "Web result via DuckDuckGo".to_string(),
+        url: url.clone(),
+        stars: 0,
+        downloads: 0,
+        license: "Web".to_string(),
+        updated_at: "".to_string(),
+        pushed_at: "".to_string(),
+        language: "".to_string(),
+        topics: Vec::new(),
+        ecosystem: "web".to_string(),
+        install_cmd: url,
+    })
+}
+
+pub fn search_candidates(query: &str, ecosystem: &str, total_limit: usize) -> Vec<Candidate> {    let key = format!(
         "{}|{}|{}",
         query.trim().to_lowercase(),
         ecosystem,
@@ -235,29 +307,38 @@ pub fn search_candidates(query: &str, ecosystem: &str, total_limit: usize) -> Ve
             eprintln!("Warning: {}", e);
             Vec::new()
         }),
+        "web" => search_duckduckgo(query, total_limit).unwrap_or_else(|e| {
+            eprintln!("Warning: {}", e);
+            Vec::new()
+        }),
         _ => {
-            // Default "all": fetch both in parallel
-            let gh_limit = total_limit.div_ceil(2);
-            let crates_limit = total_limit / 2;
-            let (gh_q, cr_q) = (query.to_string(), query.to_string());
+            // Default "all": fetch all three sources in parallel
+            let gh_limit = total_limit.div_ceil(3).max(2);
+            let crates_limit = total_limit.div_ceil(3).max(2);
+            let web_limit = total_limit.div_ceil(3).max(2);
+            let (gh_q, cr_q, web_q) = (query.to_string(), query.to_string(), query.to_string());
             let gh = std::thread::spawn(move || search_github(&gh_q, gh_limit));
             let cr = std::thread::spawn(move || search_crates_io(&cr_q, crates_limit));
-            let mut both = gh
+            let web = std::thread::spawn(move || search_duckduckgo(&web_q, web_limit));
+            let mut all = gh
                 .join()
                 .map(|r| r.unwrap_or_else(|e| {
                     eprintln!("Warning: {}", e);
                     Vec::new()
                 }))
                 .unwrap_or_default();
-            both.extend(
-                cr.join()
-                    .map(|r| r.unwrap_or_else(|e| {
-                        eprintln!("Warning: {}", e);
-                        Vec::new()
-                    }))
-                    .unwrap_or_default(),
-            );
-            both
+            for handle in [cr, web] {
+                all.extend(
+                    handle
+                        .join()
+                        .map(|r| r.unwrap_or_else(|e| {
+                            eprintln!("Warning: {}", e);
+                            Vec::new()
+                        }))
+                        .unwrap_or_default(),
+                );
+            }
+            all
         }
     };
 
@@ -275,5 +356,16 @@ mod tests {
         assert_eq!(encode_query("a&b"), "a%26b");
         assert_eq!(encode_query("c#"), "c%23");
         assert_eq!(encode_query("tokio-rs"), "tokio-rs");
+    }
+
+    #[test]
+    fn parses_duckduckgo_fixture() {
+        let good = r#"" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fpage&rut=x">Example Page</a>"#;
+        let c = parse_ddg_block(good).expect("fixture must parse");
+        assert_eq!(c.name, "Example Page");
+        assert!(c.url.contains("example.com"));
+        assert_eq!(c.ecosystem, "web");
+        assert!(parse_ddg_block("no link here").is_none());
+        assert!(parse_ddg_block(r#"" href="/relative/path">T</a>"#).is_none());
     }
 }
