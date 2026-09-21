@@ -6,11 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
 ### Fixed
 - Strict Jev parsing: missing or out-of-range answers skip the candidate loudly instead of defaulting.
 - Recency math fixed (JDN vs unix epoch). Pinned model jev-1.13.0. Candidate chunking past 5.
 - Percent-encoded queries. Loud 403/429/timeout errors with auth guidance.
 - CLI limit clamped 1-10 without panics. MCP limit is integer, ecosystem validated. Real crates licenses.
+
+## [0.1.2] - 2026-09-21
+
+### Added
+- CI (`cargo check` + `cargo test`) and release workflow: 5-target matrix binaries with SHA256.
+- First tag-based GitHub Release via automation.
+
 
 ## [0.1.1] - 2026-09-20
 
