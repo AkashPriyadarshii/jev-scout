@@ -198,7 +198,7 @@ Patna, Bihar, India
 - X / Twitter: [@Akash__ydv001](https://x.com/Akash__ydv001)  
 - Threads: [@akash.priyadarshii](https://www.threads.net/@akash.priyadarshii)  
 - Instagram: [@akash.priyadarshii](https://www.instagram.com/akash.priyadarshii/)  
-- Reddit: [u/DragonfruitWeak2801](https://reddit.com/user/DragonfruitWeak2801)
+- Reddit: [u/akashpriyadarshi](https://reddit.com/user/akashpriyadarshi)
 
 ---
 
