@@ -8,6 +8,8 @@ Keywords: typesafe-ai, jev, github-search, crates-io, rust, cli, mcp-server, cod
 
 # jev-scout
 
+**Support:** fuel the next build — [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/AkashPriyadarshi)
+
 **Zero-hallucination open-source repo and crate discovery powered by TypeSafe AI Jev.**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-0d9488.svg?style=flat-square)](LICENSE)
@@ -186,12 +188,9 @@ Patna, Bihar, India
 - LinkedIn: [akashpriyadarshii](https://linkedin.com/in/akashpriyadarshii)  
 - Resume: [akashpriyadarshii.github.io/Resume](https://akashpriyadarshii.github.io/Resume/)
 
-
-
 <p align="center">
   <img src="https://api.star-history.com/svg?repos=AkashPriyadarshii/jev-scout&type=Date" width="600" alt="star history" />
 </p>
-
 
 ## Social
 
@@ -203,8 +202,3 @@ Patna, Bihar, India
 ---
 
 *Zero hallucinations, verified repositories, sub-second decisions.*
-
-
----
-
-**Support:** fuel the next build — [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/AkashPriyadarshi)
